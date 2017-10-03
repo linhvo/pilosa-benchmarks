@@ -23,38 +23,22 @@ class ChartView(TemplateView):
         return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
-        # results = Benchmark.objects.filter(config_index=kwargs.get('slug'), name__contains=self.query)
+        if self.query:
+            results = Benchmark.objects.filter(config_index=kwargs.get('slug'), name__icontains=self.query)
+        else:
+            results = Benchmark.objects.filter(config_index=kwargs.get('slug'))
 
         context = super(ChartView, self).get_context_data(**kwargs)
-        conn = psycopg2.connect("dbname='%s'" % "benchmarks")
-        cur = conn.cursor()
-        if not self.query:
-            all_count = """SELECT pilosa_version, run_id, stats_mean_us, name FROM benchmarks WHERE config_index='%s';"""
-            psql = all_count % kwargs.get('slug')
-        else:
-            all_count = """SELECT pilosa_version, run_id, stats_mean_us, name FROM benchmarks WHERE name LIKE '%s' AND config_index='%s';"""
-            psql = all_count % (self.query, kwargs.get('slug'))
-        try:
-            cur.execute(psql)
-            conn.commit()
-        except Exception as exc:
-            print(exc)
-            conn.rollback()
-            import ipdb
-
-            ipdb.set_trace()
-
-        filters = cur.fetchall()
-        if len(filters) == 0:
+        if len(results) == 0:
             return
         version_map = defaultdict(list)
-        for ver in filters:
-            version_map[ver[0]].append((ver[1], ver[2], ver[3]))
+        for ver in results:
+            version_map[ver.pilosa_version].append((ver.run_id, ver.stats_mean_us, ver.name))
         if not self.query:
             traces = [go.Box(y=[int(val[1]) for val in version_map[key]],
                              x=[val[2] for val in version_map[key]],
                              name=key,
-                             boxpoints='all',
+                             boxpoints='outliers',
                              whiskerwidth=1, ) for key in version_map.keys()]
         else:
             traces = [go.Box(y=[int(val[1]) for val in version_map[key]],
@@ -62,6 +46,8 @@ class ChartView(TemplateView):
                              name=key, boxpoints='outliers',
                              whiskerwidth=0.2, ) for key in version_map.keys()]
         data1 = [trace for trace in traces]
-        div = opy.plot(data1, auto_open=False, output_type='div')
+
+        fig = go.Figure(data=data1)
+        div = opy.plot(fig, auto_open=False, output_type='div')
         context['graph'] = div
         return context
