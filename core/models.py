@@ -4,12 +4,16 @@ from __future__ import unicode_literals
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 
+
 class Run(models.Model):
     config = JSONField()
     uuid = models.CharField(max_length=250)
     pi_version = models.CharField(max_length=250)
     pi_build_time = models.DateTimeField()
     spawn_file = models.URLField()
+
+    def __unicode__(self):
+        return '<Run %s %s %s>' % (self.uuid, self.pi_version, self.pi_build_time)
 
 
 class Benchmark(models.Model):
@@ -29,5 +33,5 @@ class Benchmark(models.Model):
     duration_us = models.BigIntegerField()
     pilosa_version = models.CharField(max_length=250)
 
-
-
+    def __unicode__(self):
+        return '<Benchmark %s %s %s>' % (self.name, self.stats_mean_us, self.pilosa_version)
